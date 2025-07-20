@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Al-Quran Digital</title>
+    
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts: Poppins for modern UI, and Noto Naskh Arabic for beautiful Arabic script -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&family=Noto+Naskh+Arabic:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* Custom styles */
+        body {
+            font-family: 'Poppins', sans-serif;
+        }
+        /* Style for Arabic text */
+        .font-arabic {
+            font-family: 'Noto Naskh Arabic', serif;
+            line-height: 2.5; /* Increase line height for better readability of Arabic script */
+        }
+        /* Simple scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1f2937; /* gray-800 */
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #4b5563; /* gray-600 */
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #6b7280; /* gray-500 */
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white antialiased">
+
+    <!-- Main Container -->
+    <div class="container mx-auto p-4 md:p-6 max-w-4xl min-h-screen">
+
+        <!-- ===== 1. Home Page ===== -->
+        <section id="homePage" class="flex flex-col items-center justify-center text-center min-h-screen">
+            <div class="animate-fade-in-down">
+                <h1 class="text-4xl md:text-5xl font-bold text-cyan-400 mb-4">Al-Quran Digital</h1>
+                <p class="text-lg md:text-xl text-gray-300 mb-8 max-w-2xl">
+                    "Dari Hafid buat Mamak, tolong didoakan semohga keluarga kami dan seluruh umat Muslim, senantiasa diberikan keselamatan di dunia dan akhirat. Aamiin."
+                </p>
+                <button id="goToListBtn" class="bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-3 px-8 rounded-full shadow-lg transform hover:scale-105 transition-all duration-300 ease-in-out">
+                    Buka Daftar Surah
+                </button>
+            </div>
+        </section>
+
+        <!-- ===== 2. Surah List Page ===== -->
+        <section id="listPage" class="hidden">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-3xl font-bold text-cyan-400">Daftar Surah</h2>
+                <button id="backToHomeBtn" class="bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded-lg transition-colors">
+                    Kembali
+                </button>
+            </div>
+            <div id="loadingList" class="text-center p-10">
+                <p>Memuat daftar surah...</p>
+            </div>
+            <div id="surahListContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Surah cards will be inserted here by JavaScript -->
+            </div>
+        </section>
+
+        <!-- ===== 3. Surah Detail Page ===== -->
+        <section id="detailPage" class="hidden">
+            <div class="sticky top-0 bg-gray-900 bg-opacity-90 backdrop-blur-sm py-4 z-10">
+                <div class="flex justify-between items-center mb-4">
+                    <button id="backToListBtn" class="bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded-lg transition-colors">
+                        &larr; Kembali ke Daftar
+                    </button>
+                </div>
+                <div id="surahDetailHeader" class="text-center bg-gray-800 p-4 rounded-lg">
+                    <!-- Surah detail header will be inserted here -->
+                </div>
+            </div>
+            <div id="loadingDetail" class="text-center p-10">
+                <p>Memuat ayat...</p>
+            </div>
+            <div id="ayahListContainer" class="mt-6 space-y-8">
+                <!-- Ayah items will be inserted here -->
+            </div>
+        </section>
+
+    </div>
+
+    <script type="module">
+        // --- DOM Element References ---
+        const homePage = document.getElementById('homePage');
+        const listPage = document.getElementById('listPage');
+        const detailPage = document.getElementById('detailPage');
+
+        const goToListBtn = document.getElementById('goToListBtn');
+        const backToHomeBtn = document.getElementById('backToHomeBtn');
+        const backToListBtn = document.getElementById('backToListBtn');
+
+        const loadingList = document.getElementById('loadingList');
+        const surahListContainer = document.getElementById('surahListContainer');
+        
+        const loadingDetail = document.getElementById('loadingDetail');
+        const surahDetailHeader = document.getElementById('surahDetailHeader');
+        const ayahListContainer = document.getElementById('ayahListContainer');
+
+        // --- API Endpoint ---
+        const API_BASE_URL = 'https://api.quran.gading.dev';
+
+        // --- State ---
+        let allSurahs = [];
+        let isSurahListFetched = false;
+
+        // --- Navigation Functions ---
+        const showPage = (pageToShow) => {
+            homePage.classList.add('hidden');
+            listPage.classList.add('hidden');
+            detailPage.classList.add('hidden');
+            pageToShow.classList.remove('hidden');
+            window.scrollTo(0, 0); // Scroll to top on page change
+        };
+
+        // --- API Fetching and Rendering ---
+
+        /**
+         * Fetches the list of all surahs from the API
+         */
+        async function fetchSurahList() {
+            if (isSurahListFetched) {
+                showPage(listPage);
+                return;
+            }
+            showPage(listPage);
+            loadingList.classList.remove('hidden');
+            surahListContainer.innerHTML = '';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/surah`);
+                if (!response.ok) throw new Error('Gagal mengambil data surah');
+                const result = await response.json();
+                allSurahs = result.data;
+                renderSurahList(allSurahs);
+                isSurahListFetched = true;
+            } catch (error) {
+                console.error("Error fetching surah list:", error);
+                surahListContainer.innerHTML = `<p class="text-center text-red-400">${error.message}</p>`;
+            } finally {
+                loadingList.classList.add('hidden');
+            }
+        }
+
+        /**
+         * Renders the list of surahs into the container
+         * @param {Array} surahs - Array of surah objects
+         */
+        function renderSurahList(surahs) {
+            surahListContainer.innerHTML = ''; // Clear previous list
+            surahs.forEach(surah => {
+                const card = document.createElement('div');
+                card.className = 'bg-gray-800 p-4 rounded-lg cursor-pointer hover:bg-gray-700 hover:shadow-cyan-500/20 shadow-md transition-all duration-300';
+                card.dataset.surahNumber = surah.number;
+                
+                card.innerHTML = `
+                    <div class="flex items-center space-x-4">
+                        <div class="flex-shrink-0 w-12 h-12 bg-gray-700 rounded-full flex items-center justify-center text-cyan-400 font-bold">
+                            ${surah.number}
+                        </div>
+                        <div>
+                            <p class="font-bold text-lg">${surah.name.transliteration.id}</p>
+                            <p class="text-sm text-gray-400">${surah.name.translation.id} (${surah.numberOfVerses} ayat)</p>
+                        </div>
+                    </div>
+                `;
+                surahListContainer.appendChild(card);
+            });
+        }
+
+        /**
+         * Fetches the details of a specific surah
+         * @param {number} surahNumber - The number of the surah to fetch
+         */
+        async function fetchSurahDetail(surahNumber) {
+            showPage(detailPage);
+            loadingDetail.classList.remove('hidden');
+            ayahListContainer.innerHTML = '';
+            surahDetailHeader.innerHTML = '';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/surah/${surahNumber}`);
+                if (!response.ok) throw new Error('Gagal memuat detail surah.');
+                const result = await response.json();
+                renderSurahDetail(result.data);
+            } catch (error) {
+                console.error("Error fetching surah detail:", error);
+                ayahListContainer.innerHTML = `<p class="text-center text-red-400">${error.message}</p>`;
+            } finally {
+                loadingDetail.classList.add('hidden');
+            }
+        }
+
+        /**
+         * Renders the detailed view of a surah, including its verses
+         * @param {object} surahData - The detailed data of a surah
+         */
+        function renderSurahDetail(surahData) {
+            // Render Header
+            surahDetailHeader.innerHTML = `
+                <h3 class="text-3xl font-bold text-cyan-400">${surahData.name.transliteration.id}</h3>
+                <p class="font-arabic text-4xl text-white mt-2">${surahData.name.long}</p>
+                <p class="text-gray-300 mt-2">${surahData.name.translation.id} • ${surahData.revelation.id} • ${surahData.numberOfVerses} Ayat</p>
+            `;
+
+            // Render Bismillah if it's not Al-Fatihah or At-Taubah
+            if (surahData.preBismillah && surahData.number !== 1 && surahData.number !== 9) {
+                 const bismillah = document.createElement('div');
+                 bismillah.className = 'text-center my-8';
+                 bismillah.innerHTML = `<p class="font-arabic text-3xl">${surahData.preBismillah.text.arab}</p>`;
+                 ayahListContainer.appendChild(bismillah);
+            }
+
+            // Render Verses
+            surahData.verses.forEach(ayah => {
+                const ayahDiv = document.createElement('div');
+                ayahDiv.className = 'bg-gray-800 p-6 rounded-lg border-l-4 border-cyan-500';
+                
+                ayahDiv.innerHTML = `
+                    <div class="flex justify-between items-center mb-4">
+                        <span class="text-lg font-bold text-cyan-400">${surahData.number}:${ayah.number.inSurah}</span>
+                        <!-- Add other controls here if needed, e.g., play audio, copy -->
+                    </div>
+                    <p class="text-right font-arabic text-3xl md:text-4xl text-white mb-6">${ayah.text.arab}</p>
+                    <p class="text-gray-300 text-left italic mb-2">"${ayah.translation.id}"</p>
+                `;
+                ayahListContainer.appendChild(ayahDiv);
+            });
+        }
+
+        // --- Event Listeners ---
+        goToListBtn.addEventListener('click', fetchSurahList);
+
+        backToHomeBtn.addEventListener('click', () => showPage(homePage));
+        
+        backToListBtn.addEventListener('click', () => showPage(listPage));
+
+        surahListContainer.addEventListener('click', (e) => {
+            const card = e.target.closest('[data-surah-number]');
+            if (card) {
+                const surahNumber = card.dataset.surahNumber;
+                fetchSurahDetail(surahNumber);
+            }
+        });
+
+        // --- Initial Setup ---
+        showPage(homePage); // Show the home page on initial load
+
+    </script>
+</body>
+</html>
